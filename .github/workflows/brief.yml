@@ -1,0 +1,42 @@
+name: Hourly market brief
+
+on:
+  schedule:
+    - cron: "7 * * * *"   # every hour at :07 UTC (GitHub may start a few minutes late)
+  workflow_dispatch: {}    # manual "Run workflow" button
+
+permissions:
+  contents: write
+
+concurrency:
+  group: brief
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate brief
+        env:
+          ETORO_API_KEY: ${{ secrets.ETORO_API_KEY }}
+          ETORO_USER_KEY: ${{ secrets.ETORO_USER_KEY }}
+        run: python brief.py
+
+      - name: Publish
+        run: |
+          git config user.name "trade-intel-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add BRIEF.md brief.json
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Brief $(date -u +'%Y-%m-%d %H:%M') UTC"
+            git push
+          fi
